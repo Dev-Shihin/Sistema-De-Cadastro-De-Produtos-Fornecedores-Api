@@ -13,14 +13,14 @@ app.use(express.json());
 // Conecta no banco e roda migrations
 database.connect()
   .then(db => createTables(db))
-  .catch(err => console.error(err));
+  .catch(err => console.error('Erro no banco:', err));
 
 // Rotas da API
 app.use('/api', routes);
 
 // Rota raiz
 app.get('/', (req, res) => {
-  res.send('Servidor da Distribuidora rodando!');
+  res.send('Servidor da Distribuidora rodando na Vercel 🚀');
 });
 
 module.exports = app;
