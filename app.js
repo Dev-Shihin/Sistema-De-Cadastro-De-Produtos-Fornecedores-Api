@@ -1,26 +1,21 @@
 const express = require('express');
 const cors = require('cors');
-
-const database = require('./src/database/db');
 const { createTables } = require('./src/database/migrations');
-const routes = require('./src/routes');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Conecta no banco e roda migrations
-database.connect()
-  .then(db => createTables(db))
-  .catch(err => console.error('Erro no banco:', err));
+// cria tabelas no start
+createTables().then(() => console.log('Banco conectado com sucesso'));
 
-// Rotas da API
-app.use('/api', routes);
+// rotas
+app.use('/api', require('./src/routes'));
 
-// Rota raiz
+// healthcheck
 app.get('/', (req, res) => {
-  res.send('Servidor da Distribuidora rodando na Vercel 🚀');
+  res.send('API da Distribuidora rodando na nuvem ☁️');
 });
 
 module.exports = app;
