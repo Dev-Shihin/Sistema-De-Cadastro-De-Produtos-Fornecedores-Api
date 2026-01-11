@@ -23,8 +23,4 @@ app.get('/', (req, res) => {
   res.send('Servidor da Distribuidora rodando!');
 });
 
-// Porta
-const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`🚀 API ativa em http://localhost:${PORT}`);
-});
+module.exports = app;
