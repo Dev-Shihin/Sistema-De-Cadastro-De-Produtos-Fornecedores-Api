@@ -5,15 +5,20 @@ const pool = new Pool({
   ssl: { 
     rejectUnauthorized: false 
   },
-  // Configurações adicionais para serverless
-  max: 1, // Máximo de conexões 
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  // Configurações otimizadas para serverless
+  max: 1, // Apenas 1 conexão por função
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 5000, // Timeout de 5s
 });
 
-// Testa conexão
+// Log de erros do pool
 pool.on('error', (err) => {
-  console.error('Erro inesperado no pool do PostgreSQL:', err);
+  console.error('Erro inesperado no pool PostgreSQL:', err);
+});
+
+// Testa conexão (opcional)
+pool.on('connect', () => {
+  console.log('Conectado ao PostgreSQL');
 });
 
 module.exports = pool;
