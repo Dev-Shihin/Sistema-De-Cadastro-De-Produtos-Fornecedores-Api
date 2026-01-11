@@ -1,4 +1,4 @@
-const database = require('../database/db');
+const db = require('../database/db');
 
 /* =======================
    Validação
@@ -14,110 +14,105 @@ function validarProduto(produto) {
         erros.push('Preço deve ser um valor positivo');
     }
 
-    if (produto.codigo_barras && typeof produto.codigo_barras !== 'string') {
-        erros.push('Código de barras inválido');
+    if (produto.estoque === undefined || produto.estoque < 0) {
+        erros.push('Estoque deve ser um valor positivo');
     }
 
     return erros;
 }
 
 /* =======================
-   CRUD
+   CRUD - PostgreSQL
 ======================= */
 
 // Criar produto
-function criarProduto(produto) {
-    return new Promise((resolve, reject) => {
-        const erros = validarProduto(produto);
-        if (erros.length > 0) return reject({ erros });
+async function criarProduto(produto) {
+    const erros = validarProduto(produto);
+    if (erros.length > 0) {
+        throw { erros };
+    }
 
-        const db = database.getConnection();
+    const { nome, preco, estoque, categoria } = produto;
 
-        const sql = `
-            INSERT INTO produtos (nome, descricao, preco, codigo_barras)
-            VALUES (?, ?, ?, ?)
-        `;
+    const result = await db.query(
+        `INSERT INTO produtos (nome, preco, estoque, categoria) 
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [nome.trim(), preco, estoque || 0, categoria || null]
+    );
 
-        db.run(sql, [
-            produto.nome.trim(),
-            produto.descricao || null,
-            produto.preco,
-            produto.codigo_barras || null
-        ], function (err) {
-            if (err) return reject(err);
-            resolve({ id: this.lastID, ...produto });
-        });
-    });
+    return result.rows[0];
 }
 
 // Listar todos os produtos
-function listarProdutos() {
-    return new Promise((resolve, reject) => {
-        const db = database.getConnection();
+async function listarProdutos() {
+    const result = await db.query(
+        'SELECT * FROM produtos ORDER BY nome'
+    );
 
-        db.all(`SELECT * FROM produtos ORDER BY nome`, [], (err, rows) => {
-            if (err) return reject(err);
-            resolve(rows || []);
-        });
-    });
+    return result.rows;
 }
 
 // Buscar produto por ID
-function buscarProdutoPorId(id) {
-    return new Promise((resolve, reject) => {
-        if (!id || isNaN(id)) return reject({ erro: 'ID inválido' });
+async function buscarProdutoPorId(id) {
+    if (!id || isNaN(id)) {
+        throw { erro: 'ID inválido' };
+    }
 
-        const db = database.getConnection();
+    const result = await db.query(
+        'SELECT * FROM produtos WHERE id = $1',
+        [id]
+    );
 
-        db.get(`SELECT * FROM produtos WHERE id = ?`, [id], (err, row) => {
-            if (err) return reject(err);
-            if (!row) return reject({ erro: 'Produto não encontrado' });
-            resolve(row);
-        });
-    });
+    if (result.rows.length === 0) {
+        throw { erro: 'Produto não encontrado' };
+    }
+
+    return result.rows[0];
 }
 
 // Atualizar produto
-function atualizarProduto(id, produto) {
-    return new Promise((resolve, reject) => {
-        const erros = validarProduto(produto);
-        if (erros.length > 0) return reject({ erros });
+async function atualizarProduto(id, produto) {
+    const erros = validarProduto(produto);
+    if (erros.length > 0) {
+        throw { erros };
+    }
 
-        const db = database.getConnection();
+    const { nome, preco, estoque, categoria } = produto;
 
-        const sql = `
-            UPDATE produtos 
-            SET nome = ?, descricao = ?, preco = ?, codigo_barras = ?
-            WHERE id = ?
-        `;
+    const result = await db.query(
+        `UPDATE produtos 
+         SET nome = $1, preco = $2, estoque = $3, categoria = $4
+         WHERE id = $5 RETURNING *`,
+        [nome.trim(), preco, estoque || 0, categoria || null, id]
+    );
 
-        db.run(sql, [
-            produto.nome.trim(),
-            produto.descricao || null,
-            produto.preco,
-            produto.codigo_barras || null,
-            id
-        ], function (err) {
-            if (err) return reject(err);
-            if (this.changes === 0) return reject({ erro: 'Produto não encontrado' });
-            resolve({ id, ...produto });
-        });
-    });
+    if (result.rows.length === 0) {
+        throw { erro: 'Produto não encontrado' };
+    }
+
+    return result.rows[0];
 }
 
 // Deletar produto
-function deletarProduto(id) {
-    return new Promise((resolve, reject) => {
-        if (!id || isNaN(id)) return reject({ erro: 'ID inválido' });
+async function deletarProduto(id) {
+    if (!id || isNaN(id)) {
+        throw { erro: 'ID inválido' };
+    }
 
-        const db = database.getConnection();
+    const result = await db.query(
+        'DELETE FROM produtos WHERE id = $1 RETURNING *',
+        [id]
+    );
 
-        db.run(`DELETE FROM produtos WHERE id = ?`, [id], function (err) {
-            if (err) return reject(err);
-            if (this.changes === 0) return reject({ erro: 'Produto não encontrado' });
-            resolve({ id, deletado: true });
-        });
-    });
+    if (result.rows.length === 0) {
+        throw { erro: 'Produto não encontrado' };
+    }
+
+    return { 
+        id, 
+        deletado: true,
+        produto: result.rows[0]
+    };
 }
 
 module.exports = {

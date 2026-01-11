@@ -1,4 +1,4 @@
-const database = require('../database/db');
+const db = require('../database/db');
 
 /* =======================
    Validação
@@ -18,96 +18,97 @@ function validarFornecedor(fornecedor) {
 }
 
 /* =======================
-   CRUD
+   CRUD - PostgreSQL
 ======================= */
 
-function criarFornecedor(fornecedor) {
-  return new Promise(async (resolve, reject) => {
-    const erros = validarFornecedor(fornecedor);
-    if (erros.length > 0) return reject({ erros });
+// Criar fornecedor
+async function criarFornecedor(fornecedor) {
+  const erros = validarFornecedor(fornecedor);
+  if (erros.length > 0) {
+    throw { erros };
+  }
 
-    const db = database.getConnection();
+  const { nome, cnpj, telefone, email } = fornecedor;
 
-    const sql = `
-      INSERT INTO fornecedores (nome, cnpj, endereco, contato)
-      VALUES (?, ?, ?, ?)
-    `;
+  const result = await db.query(
+    `INSERT INTO fornecedores (nome, cnpj, telefone, email) 
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [nome.trim(), cnpj.trim(), telefone || null, email || null]
+  );
 
-    db.run(sql, [
-      fornecedor.nome.trim(),
-      fornecedor.cnpj.trim(),
-      fornecedor.endereco || null,
-      fornecedor.contato || null
-    ], function (err) {
-      if (err) return reject(err);
-      resolve({ id: this.lastID, ...fornecedor });
-    });
-  });
+  return result.rows[0];
 }
 
-function listarFornecedores() {
-  return new Promise((resolve, reject) => {
-    const db = database.getConnection();
-    db.all(`SELECT * FROM fornecedores ORDER BY nome`, [], (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows || []);
-    });
-  });
+// Listar todos os fornecedores
+async function listarFornecedores() {
+  const result = await db.query(
+    'SELECT * FROM fornecedores ORDER BY nome'
+  );
+
+  return result.rows;
 }
 
-function buscarFornecedorPorId(id) {
-  return new Promise((resolve, reject) => {
-    if (!id || isNaN(id)) return reject({ erro: 'ID inválido' });
+// Buscar fornecedor por ID
+async function buscarFornecedorPorId(id) {
+  if (!id || isNaN(id)) {
+    throw { erro: 'ID inválido' };
+  }
 
-    const db = database.getConnection();
+  const result = await db.query(
+    'SELECT * FROM fornecedores WHERE id = $1',
+    [id]
+  );
 
-    db.get(`SELECT * FROM fornecedores WHERE id = ?`, [id], (err, row) => {
-      if (err) return reject(err);
-      if (!row) return reject({ erro: 'Fornecedor não encontrado' });
-      resolve(row);
-    });
-  });
+  if (result.rows.length === 0) {
+    throw { erro: 'Fornecedor não encontrado' };
+  }
+
+  return result.rows[0];
 }
 
-function atualizarFornecedor(id, fornecedor) {
-  return new Promise((resolve, reject) => {
-    const erros = validarFornecedor(fornecedor);
-    if (erros.length > 0) return reject({ erros });
+// Atualizar fornecedor
+async function atualizarFornecedor(id, fornecedor) {
+  const erros = validarFornecedor(fornecedor);
+  if (erros.length > 0) {
+    throw { erros };
+  }
 
-    const db = database.getConnection();
+  const { nome, cnpj, telefone, email } = fornecedor;
 
-    const sql = `
-      UPDATE fornecedores 
-      SET nome = ?, cnpj = ?, endereco = ?, contato = ?
-      WHERE id = ?
-    `;
+  const result = await db.query(
+    `UPDATE fornecedores 
+     SET nome = $1, cnpj = $2, telefone = $3, email = $4
+     WHERE id = $5 RETURNING *`,
+    [nome.trim(), cnpj.trim(), telefone || null, email || null, id]
+  );
 
-    db.run(sql, [
-      fornecedor.nome.trim(),
-      fornecedor.cnpj.trim(),
-      fornecedor.endereco || null,
-      fornecedor.contato || null,
-      id
-    ], function (err) {
-      if (err) return reject(err);
-      if (this.changes === 0) return reject({ erro: 'Fornecedor não encontrado' });
-      resolve({ id, ...fornecedor });
-    });
-  });
+  if (result.rows.length === 0) {
+    throw { erro: 'Fornecedor não encontrado' };
+  }
+
+  return result.rows[0];
 }
 
-function deletarFornecedor(id) {
-  return new Promise((resolve, reject) => {
-    if (!id || isNaN(id)) return reject({ erro: 'ID inválido' });
+// Deletar fornecedor
+async function deletarFornecedor(id) {
+  if (!id || isNaN(id)) {
+    throw { erro: 'ID inválido' };
+  }
 
-    const db = database.getConnection();
+  const result = await db.query(
+    'DELETE FROM fornecedores WHERE id = $1 RETURNING *',
+    [id]
+  );
 
-    db.run(`DELETE FROM fornecedores WHERE id = ?`, [id], function (err) {
-      if (err) return reject(err);
-      if (this.changes === 0) return reject({ erro: 'Fornecedor não encontrado' });
-      resolve({ id, deletado: true });
-    });
-  });
+  if (result.rows.length === 0) {
+    throw { erro: 'Fornecedor não encontrado' };
+  }
+
+  return { 
+    id, 
+    deletado: true,
+    fornecedor: result.rows[0]
+  };
 }
 
 module.exports = {
